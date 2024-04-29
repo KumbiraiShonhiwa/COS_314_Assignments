@@ -66,6 +66,7 @@ public class Knapsack {
     public Knapsack(Knapsack other) {
         this.weightLimit = other.weightLimit;
         this.totalWeight = other.totalWeight;
+        this.totalValue = other.totalValue;
         this.items = new ArrayList<Item>();
         for (Item item : other.items) {
             this.items.add(new Item(item));
@@ -130,6 +131,8 @@ public class Knapsack {
     }
 
     public void print() {
+        System.out.println("Fitness: " + calculateFitness() + " Total Weight: " + totalWeight + " Total Value: "
+                + totalValue );
         for (int i = 0; i < items.size(); i++) {
             if (getItemAtIndex(i) != null)
                 System.out.println("ITEM: " + i + " Weight: " + getItemAtIndex(i).getWeight() + " Value: "
@@ -138,6 +141,9 @@ public class Knapsack {
     }
 
     public double calculateFitness() {
+        if (totalWeight == 0) {
+            return 0;
+        }
         return (double) totalValue / (double) totalWeight;
     }
 

@@ -1,8 +1,12 @@
 import java.util.Random;
 import java.util.Scanner;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
+
 public class GA_LS {
     private int generations;
     private int weightLimit;
@@ -10,6 +14,7 @@ public class GA_LS {
     private double crossoverRate;
     public ArrayList<Knapsack> population;
     public ArrayList<Item> items;
+    private Knapsack best_solution;
     private Random rand;
     private int populationSize;
     private int bestWeight;
@@ -29,13 +34,28 @@ public class GA_LS {
         this.generations = generations;
     }
 
-    public void print(ArrayList<Knapsack> population) {
+    public String print(ArrayList<Knapsack> population) {
+        String string = "";
         for (int i = 0; i < population.size(); i++) {
-            System.out.println(
-                    "Knapsack Solution " + i + ":" + " Fitness of Solution: " + population.get(i).calculateFitness()
-                            + " Value: " + population.get(i).totalValue + " Weight: " + population.get(i).totalWeight
-                            + "\n");
-            population.get(i).print();
+            string += ("Knapsack Solution " + i + ":" + " Fitness of Solution: " + population.get(i).calculateFitness()
+                    + " Value: " + population.get(i).totalValue + " Weight: " + population.get(i).totalWeight
+                    + "\n");
+        }
+        return string;
+    }
+
+    public void writeToFile(String input) {
+        try {
+            File file = new File("output.txt");
+            if (!file.exists()) {
+                file.createNewFile();
+            }
+            FileWriter fileWriter = new FileWriter(file);
+            BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
+            bufferedWriter.write(input);
+            bufferedWriter.close();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
@@ -45,12 +65,15 @@ public class GA_LS {
         try {
             File object = new File(file);
             Scanner readFile = new Scanner(object);
+            if (readFile.hasNext()) {
+                readFile.nextLine();
+            }
             while (readFile.hasNextLine()) {
-                if (readFile.hasNextInt()) {
-                    value = readFile.nextInt();
+                if (readFile.hasNextDouble()) {
+                    value = (int) readFile.nextDouble();
                 }
-                if (readFile.hasNextInt()) {
-                    weight = readFile.nextInt();
+                if (readFile.hasNextDouble()) {
+                    weight = (int) readFile.nextDouble();
                 }
                 items.add(new Item(value, weight));
             }
@@ -86,7 +109,7 @@ public class GA_LS {
                 break;
             }
         }
-        print(population);
+        writeToFile(print(population));
     }
 
     public boolean checkDuplicateSolution(Knapsack knapsack) {
@@ -177,31 +200,101 @@ public class GA_LS {
         return null;
     }
 
-    public void SteadyState(ArrayList<Knapsack> offspring, ArrayList<Knapsack> population) {
-        for (int i = 0; i < offspring.size(); i++) {
-            if (offspring.get(i) != null) {
-                for (int j = 0; j < population.size(); j++) {
-                    if (offspring.get(i).calculateFitness() > population.get(j).calculateFitness()) {
-                        population.set(j, offspring.get(i));
-                        break;
-                    }
+    public void SteadyState(Knapsack offspring, ArrayList<Knapsack> population) {
+
+        if (offspring != null) {
+            for (int j = 0; j < population.size(); j++) {
+                if (offspring.calculateFitness() > population.get(j).calculateFitness()) {
+                    population.set(j, offspring);
+                    break;
                 }
             }
         }
     }
 
+    private Knapsack perturbSolution(Knapsack knapsack) {
+        Knapsack newKnapsack = new Knapsack(knapsack.getWeightLimit());
+        for (int i = 0; i < knapsack.getItems().size(); i++) {
+            Item item = randomItem();
+            if (!newKnapsack.hasSameItem(item))
+                newKnapsack.addItem(item);
+            else {
+                i--;
+
+            }
+        }
+        return newKnapsack;
+    }
+
+    private boolean shouldAccept(double deltaCost, double temperature) {
+        if (deltaCost < 0) {
+            return true;
+        }
+        return rand.nextDouble() < Math.exp(-deltaCost / temperature);
+    }
+
+    private Knapsack SimulatedAnnealing(ArrayList<Knapsack> bag, int number_iterations) {
+        double temperature = 1000;
+        if (bag.size() == 0) {
+            return null;
+        }
+        int index = rand.nextInt(bag.size());
+        Knapsack current = bag.get(index);
+        Knapsack best = bag.get(index);
+        Knapsack neighbor = new Knapsack(bag.get(index).getWeightLimit());
+        int t = 1;
+        int no_Improvement = 0;
+        while (temperature > 0 && no_Improvement < number_iterations) {
+            neighbor = perturbSolution(current);
+            double deltaCost = neighbor.totalValue - current.totalValue;
+            if (shouldAccept(deltaCost, temperature / Math.log(t + 1))) {
+                current = new Knapsack(neighbor);
+                if (current.calculateFitness() > best.calculateFitness()) {
+                    best = new Knapsack(current);
+                    no_Improvement = 0;
+                } else {
+                    no_Improvement++;
+                }
+            }
+            temperature = temperature / Math.log(t + 1);
+            t++;
+        }
+        return best;
+    }
+
+    public Knapsack findBest(Knapsack best,ArrayList<Knapsack> population) {
+        // Knapsack best = population.get(0);
+        for (int i = 0; i < population.size(); i++) {
+            if (best != null && population.get(i) != null)
+                if (population.get(i).calculateFitness() > best.calculateFitness()) {
+                    best = population.get(i);
+                }
+        }
+        return best;
+    }
+
     public void run(String file) {
+        long startTime = System.currentTimeMillis();
         int iterations = 0;
+        Knapsack best = new Knapsack(weightLimit);
         readFile(file);
         initializePopulation();
+        best = population.get(0);
         while (iterations < generations) {
             // System.out.println("Generation " + iterations + "\n");
             ArrayList<Knapsack> mating_pool = topHalf();
             ArrayList<Knapsack> crossover_pool = crossover(mating_pool);
+            Knapsack SA = SimulatedAnnealing(crossover_pool, 100);
+            best = findBest(best, population);
             mutate(crossover_pool);
-            SteadyState(crossover_pool, population);
+            SteadyState(SA, population);
             iterations++;
-        } 
-        print(population);
-    }   
+        }
+        long endTime = System.currentTimeMillis();
+        System.out.println("Time taken: " + (double) (endTime - startTime) / 1000 + "s");
+        writeToFile(print(population));
+        best.print();
+        System.out.println("\n");
+
+    }
 }

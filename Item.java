@@ -3,7 +3,7 @@ public class Item {
     public int[] gene = new int[2];
     private double fitness;
 
-    public Item(int weight, int value) {
+    public Item(int value, int weight) {
         this.gene[0] = weight;
         this.gene[1] = value;
     }
