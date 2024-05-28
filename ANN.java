@@ -1,15 +1,22 @@
 import java.util.ArrayList;
 import java.util.Random;
 
+
 public class ANN {
     private int inputNodes;
+    public double error = 0;
     private int hiddenNodes;
     private int outputNodes;
     private double learningRate;
-    private ArrayList<ArrayList<Double>> weightsInputHidden;
-    private ArrayList<ArrayList<Double>> weightsHiddenOutput;
-    private double biasHidden;
-    private double biasOutput;
+    public  int truePositives = 0;
+    public  int trueNegatives = 0;
+    public  int falsePositives = 0;
+    public  int falseNegatives = 0;
+    public ArrayList<ArrayList<Double>> weightsInputHidden;
+    public ArrayList<ArrayList<Double>> weightsHiddenOutput;
+    public double biasHidden;
+    public double biasOutput;
+    public double accuracy = 0;
 
     public ANN(int inputNodes, int hiddenNodes, int outputNodes, double learningRate) {
         this.inputNodes = inputNodes;
@@ -48,17 +55,21 @@ public class ANN {
         return s * (1 - s);
     }
 
-    public void train(ArrayList<Double> inputs, ArrayList<Double> targets) {
-        // Feedforward
+    public void calculateAccuracy(ArrayList<Double> inputs, ArrayList<Double> targets, int start) {
         // Feedforward
         // Step 1: Calculate n1 for each node in the hidden layer
         ArrayList<Double> hiddenN1 = new ArrayList<>();
         for (int i = 0; i < hiddenNodes; i++) {
             double sum = biasHidden;
             for (int j = 0; j < inputNodes; j++) {
-                sum += inputs.get(j) * weightsInputHidden.get(i).get(j);
+                if (j < inputs.size()) {
+                    sum += inputs.get(j) * weightsInputHidden.get(i).get(j);
+                } else {
+                    break;
+                }
             }
             hiddenN1.add(sum);
+            // System.out.println(sum);
         }
 
         // Step 2: Calculate the activation f(n1) for each node in the hidden layer
@@ -82,6 +93,33 @@ public class ANN {
         for (Double n2 : outputN2) {
             outputs.add(sigmoid(n2));
         }
+
+        // Calculate accuracy
+        int correctPredictions = 0;
+        for (int i = 0; i < targets.size(); i++) {
+            if (i >= outputs.size()) {
+                break;
+            }
+            double target = targets.get(i);
+            double output = outputs.get(i);
+
+            // If the output is closer to 1 and the target is 1, or if the output is closer
+            // to 0 and the target is 0, increment correctPredictions
+            if ((output >= 0.5 && target == 1.0)) {
+                correctPredictions++;
+                truePositives++;
+            } else if (output < 0.5 && target == 0.0) {
+                correctPredictions++;
+                trueNegatives++;
+            } else if (output >= 0.5 && target == 0.0) {
+                falsePositives++;
+            } else if (output < 0.5 && target == 1.0) {
+                falseNegatives++;
+            }
+        }
+
+        accuracy = (double) correctPredictions;
+        // System.out.println("Accuracy: " + accuracy);
 
         // Backpropagation
         // Step 1: Calculate the error information term for each node in the output
@@ -143,12 +181,14 @@ public class ANN {
             hiddenBiasCorrections.add(learningRate * hiddenErrors.get(i));
         }
 
-        double error = 0.0;
         for (int i = 0; i < targets.size(); i++) {
-            error += Math.pow(targets.get(i) - outputs.get(i), 2);
+            if (i >= outputs.size()) {
+                break;
+            }
+            this.error += Math.pow(targets.get(i) - outputs.get(i), 2);
         }
-        error /= 2;
-        System.out.println("Error after this epoch: " + error);
+        this.error = this.error /= 2;
+        // System.out.println("Error after this epoch: " + error);
 
         // Update weights and biases
         for (int i = 0; i < outputNodes; i++) {
@@ -160,10 +200,78 @@ public class ANN {
         }
         for (int i = 0; i < hiddenNodes; i++) {
             for (int j = 0; j < inputNodes; j++) {
+                if (j >= inputs.size()) {
+                    break;
+                }
                 weightsInputHidden.get(i).set(j,
                         weightsInputHidden.get(i).get(j) + hiddenWeightCorrections.get(i).get(j));
             }
             biasHidden += hiddenBiasCorrections.get(i);
         }
+    }
+
+    public void calc(ArrayList<Double> inputs, ArrayList<Double> targets, int start) {
+        // Feedforward
+        // Step 1: Calculate n1 for each node in the hidden layer
+        ArrayList<Double> hiddenN1 = new ArrayList<>();
+        for (int i = 0; i < hiddenNodes; i++) {
+            double sum = biasHidden;
+            for (int j = 0; j < inputNodes; j++) {
+                if (j < inputs.size()) {
+                    sum += inputs.get(j) * weightsInputHidden.get(i).get(j);
+                } else {
+                    break;
+                }
+            }
+            hiddenN1.add(sum);
+            // System.out.println(sum);
+        }
+
+        // Step 2: Calculate the activation f(n1) for each node in the hidden layer
+        ArrayList<Double> hiddenInputs = new ArrayList<>();
+        for (Double n1 : hiddenN1) {
+            hiddenInputs.add(sigmoid(n1));
+        }
+
+        // Step 3: Calculate n2 for each node in the output layer
+        ArrayList<Double> outputN2 = new ArrayList<>();
+        for (int i = 0; i < outputNodes; i++) {
+            double sum = biasOutput;
+            for (int j = 0; j < hiddenNodes; j++) {
+                sum += hiddenInputs.get(j) * weightsHiddenOutput.get(i).get(j);
+            }
+            outputN2.add(sum);
+        }
+
+        // Step 4: Calculate the activation f(n2) for each node in the output layer
+        ArrayList<Double> outputs = new ArrayList<>();
+        for (Double n2 : outputN2) {
+            outputs.add(sigmoid(n2));
+        }
+
+        // Calculate accuracy
+        int correctPredictions = 0;
+        for (int i = 0; i < targets.size(); i++) {
+            if (i >= outputs.size()) {
+                break;
+            }
+            double target = targets.get(i);
+            double output = outputs.get(i);
+            // If the output is closer to 1 and the target is 1, or if the output is closer
+            // to 0 and the target is 0, increment correctPredictions
+            if ((output >= 0.5 && target == 1.0)) {
+                correctPredictions++;
+                truePositives++;
+            } else if (output < 0.5 && target == 0.0) {
+                correctPredictions++;
+                trueNegatives++;
+            } else if (output >= 0.5 && target == 0.0) {
+                falsePositives++;
+            } else if (output < 0.5 && target == 1.0) {
+                falseNegatives++;
+            }
+        }
+
+        accuracy = (double) correctPredictions;
     }
 }
